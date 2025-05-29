@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <cctype>
+#include <tuple>
+#include <map>
 
 struct Data
 {
@@ -30,39 +32,26 @@ bool isNumber(const std::string &s)
 std::string trimQuotes(const std::string &s)
 {
     if (s.size() >= 2 && s.front() == '"' && s.back() == '"')
-    {
         return s.substr(1, s.size() - 2);
-    }
+
     return s;
 }
 
-std::vector<std::string> readLinesFromFile(const std::string &filename)
+std::vector<Data> fileOpen(const std::string &filename)
 {
     std::ifstream inputFile(filename);
-    std::vector<std::string> lines;
+    std::vector<Data> segments;
 
     if (!inputFile.is_open())
     {
         std::cout << "File open fail: " << filename << std::endl;
-        return lines;
+        return segments;
     }
 
     std::string line;
-    while (std::getline(inputFile, line))
-    {
-        lines.push_back(line);
-    }
-
-    inputFile.close();
-    return lines;
-}
-
-std::vector<Data> parseDataFromLines(const std::vector<std::string> &lines)
-{
-    std::vector<Data> segments;
     int lineNum = 0;
 
-    for (const auto &line : lines)
+    while (std::getline(inputFile, line))
     {
         lineNum++;
 
@@ -104,38 +93,46 @@ std::vector<Data> parseDataFromLines(const std::vector<std::string> &lines)
         }
     }
 
+    inputFile.close();
     return segments;
+}
+
+void printDuplicates(const std::vector<Data> &segments)
+{
+    std::map<std::tuple<std::string, std::string, int, int>, int> countMap;
+
+    for (const auto &seg : segments)
+    {
+        auto key = std::make_tuple(seg.StrName, seg.Scheme, seg.StarHouseNum, seg.EndHouseNum);
+        countMap[key]++;
+    }
+
+    std::cout << "Duplicate rows:" << std::endl;
+
+    for (const auto &[key, count] : countMap)
+    {
+        if (count > 1)
+        {
+            const auto &[name, scheme, from, to] = key;
+            std::cout<< name << " " << scheme << " " << from << " " << to << std::endl;
+        }
+    }
 }
 
 int main()
 {
     std::string filename = "a.txt";
-    // std::string filename = "network.mid";
-    std::vector<std::string> lines = readLinesFromFile(filename);
-
-    if (lines.empty())
-    {
-        std::cout << "No data read from file." << std::endl;
-        return 1;
-    }
-
-    std::vector<Data> segments = parseDataFromLines(lines);
+    std::vector<Data> segments = fileOpen(filename);
 
     if (segments.empty())
     {
-        std::cout << "No valid data parsed." << std::endl;
+        std::cout << "Data Read NOTOK" << std::endl;
         return 1;
     }
 
-    std::cout << "Row numbers: " << segments.size() << std::endl;
+    std::cout << "Valid row count (excluding duplicates, invalid or empty rows): " << segments.size() << std::endl;
 
-    for (const auto &segment : segments)
-    {
-        std::cout << segment.StrName << "\t"
-                  << segment.Scheme << "\t"
-                  << segment.StarHouseNum << "\t"
-                  << segment.EndHouseNum << std::endl;
-    }
+    printDuplicates(segments);
 
     return 0;
 }
