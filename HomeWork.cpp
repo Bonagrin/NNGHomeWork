@@ -18,12 +18,16 @@ struct Data
 bool isNumber(const std::string &s)
 {
     if (s.empty())
+    {
         return false;
+    }
 
     for (char c : s)
     {
         if (!std::isdigit(c))
+        {
             return false;
+        }
     }
 
     return true;
@@ -32,7 +36,9 @@ bool isNumber(const std::string &s)
 std::string trimQuotes(const std::string &s)
 {
     if (s.size() >= 2 && s.front() == '"' && s.back() == '"')
+    {
         return s.substr(1, s.size() - 2);
+    }
 
     return s;
 }
@@ -49,6 +55,7 @@ std::vector<Data> fileOpen(const std::string &filename)
     }
 
     std::string line;
+
     int lineNum = 0;
 
     while (std::getline(inputFile, line))
@@ -87,6 +94,7 @@ std::vector<Data> fileOpen(const std::string &filename)
                 segments.push_back(segment);
             }
         }
+
         catch (const std::exception &e)
         {
             std::cout << "Row #" << lineNum << " irrelevant: " << e.what() << std::endl;
@@ -94,27 +102,98 @@ std::vector<Data> fileOpen(const std::string &filename)
     }
 
     inputFile.close();
+
     return segments;
 }
 
 void printDuplicates(const std::vector<Data> &segments)
 {
-    std::map<std::tuple<std::string, std::string, int, int>, int> countMap;
+    using Key = std::pair<std::string, std::string>;
+
+    std::map<Key, std::map<int, int>> houseCounts;
 
     for (const auto &seg : segments)
     {
-        auto key = std::make_tuple(seg.StrName, seg.Scheme, seg.StarHouseNum, seg.EndHouseNum);
-        countMap[key]++;
+        Key key = {seg.StrName, seg.Scheme};
+        int from = seg.StarHouseNum;
+        int to = seg.EndHouseNum;
+
+        if (from > to)
+        {
+            std::swap(from, to);
+        }
+
+        int step = 1;
+
+        if (seg.Scheme == "O")
+        {
+            step = 2, from = (from % 2 == 0 ? from + 1 : from);
+        }
+
+        else if (seg.Scheme == "E")
+        {
+            step = 2, from = (from % 2 == 0 ? from : from + 1);
+        }
+
+        for (int i = from; i <= to; i += step)
+        {
+            houseCounts[key][i]++;
+        }
     }
 
-    std::cout << "Duplicate rows:" << std::endl;
+    std::cout << "\nDuplicated house numbers:\n";
 
-    for (const auto &[key, count] : countMap)
+    for (const auto &[key, counts] : houseCounts)
     {
-        if (count > 1)
+        const auto &[street, scheme] = key;
+        std::vector<std::pair<int, int>> ranges;
+
+        int start = -1, prev = -1;
+
+        for (const auto &[hnum, count] : counts)
         {
-            const auto &[name, scheme, from, to] = key;
-            std::cout<< name << " " << scheme << " " << from << " " << to << std::endl;
+            if (count < 2)
+            {
+                continue;
+            }
+
+            if (start == -1)
+            {
+                start = prev = hnum;
+            }
+            else
+            {
+                int diff = hnum - prev;
+                bool isSequential = (scheme == "M" && diff == 1) || ((scheme == "O" || scheme == "E") && diff == 2);
+
+                if (isSequential)
+                {
+                    prev = hnum;
+                }
+
+                else
+                {
+                    ranges.emplace_back(start, prev);
+                    start = prev = hnum;
+                }
+            }
+        }
+
+        if (start != -1)
+        {
+            ranges.emplace_back(start, prev);
+        }
+
+        for (const auto &[s, e] : ranges)
+        {
+            if (s == e)
+            {
+                std::cout << street << " " << scheme << " " << s << std::endl;
+            }
+            else
+            {
+                std::cout << street << " " << scheme << " " << s << " " << e << std::endl;
+            }
         }
     }
 }
@@ -130,7 +209,7 @@ int main()
         return 1;
     }
 
-    std::cout << "Valid row count (excluding duplicates, invalid or empty rows): " << segments.size() << std::endl;
+    std::cout << "Valid row count (excluding invalid or empty rows): " << segments.size() << std::endl;
 
     printDuplicates(segments);
 
